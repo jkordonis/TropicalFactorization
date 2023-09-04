@@ -1,0 +1,144 @@
+import numpy as np
+import TropicalFactorizationFunctions as FCT
+from numpy import ma 
+import FastSTMF
+import time
+import matplotlib.pyplot as plt
+ITER_count=10000
+
+
+Time_begin = time.time()
+ERR_GD         = np.zeros((10,ITER_count))
+ERR_Geo        = np.zeros((10,ITER_count))
+ERR_Addi       = np.zeros((10,ITER_count))
+ERR_Addi_rand  = np.zeros((10,ITER_count))
+Error_FastSTMF = np.zeros(10)
+
+n=10
+p=11
+r=5
+
+for sample in range(10):
+    print('sample=',sample,sample,time.time()-Time_begin)
+
+    C=np.random.rand(n,r)
+    D=np.random.rand(r,p)
+    C_or=C
+    D_or=D
+    ADd_mat=np.random.rand(n,p)*0.1
+    B=FCT.trop_mat_mul(C,D)+ADd_mat
+    
+    data = ma.array(B, mask=np.zeros((n,p)))
+    model = FastSTMF.FastSTMF(rank=r, initialization="random_vcol", threshold=2000)
+    U_in,V_in=model.fit(data)
+    approx = model.predict_all()
+    B_est = FCT.trop_mat_mul(model.U.data,model.V.data)
+    Error_FastSTMF[sample] = np.linalg.norm(B-B_est)/np.linalg.norm(ADd_mat)
+    print('Error FastTMF: ', np.linalg.norm(B-B_est))
+    
+     
+    C,D,Errr=FCT.Factorization_Iteration_George_Diminishing(B,r,U_in,V_in,ITER_count,Speaking=False,DiminishingStepSizeConst=ITER_count*10000)
+    ERR_GD[sample]=Errr/np.linalg.norm(ADd_mat)
+    B_est=FCT.trop_mat_mul(C,D)
+    print('Error GD',ERR_GD[sample,-1])
+    
+    
+    C,D,Errr=FCT.Factorization_Iteration_George_Diminishing(B,r,U_in,V_in,ITER_count,Speaking=False,DiminishingStepSizeConst=1000)
+    ERR_Geo[sample]=Errr/np.linalg.norm(ADd_mat)
+    B_est=FCT.trop_mat_mul(C,D)
+    print('Error GD+Geo',ERR_Geo[sample,-1])
+    
+    C,D,Errr=FCT.Factorization_Iteration(B,r,U_in,V_in,ITER_count,Speaking=False,DiminishingStepSizeConst=1000)
+    ERR_Addi[sample]=Errr/np.linalg.norm(ADd_mat)
+    print('Error GD + eps',ERR_Addi[sample,-1])    
+    
+    C,D,Errr=FCT.Factorization_Iteration_Random(B,r,U_in,V_in,ITER_count,Speaking=False,Noise_Con=0.001)
+    ERR_Addi_rand[sample]=Errr/np.linalg.norm(ADd_mat)
+    print('Error GD + Man',ERR_Addi_rand[sample,-1])    
+    
+    
+    
+cur_err = ERR_GD
+mean_=cur_err.T.mean(-1)
+std_=cur_err.T.std(-1)
+col = '#288881'
+plt.plot(mean_)
+plt.fill_between(range(ITER_count),mean_-std_,mean_+std_,color=col, alpha=0.2)
+
+
+cur_err = ERR_Geo
+col ='#C84023'
+mean_=cur_err.T.mean(-1)
+std_=cur_err.T.std(-1)
+plt.plot(mean_,color=col)
+plt.fill_between(range(ITER_count),mean_-std_,mean_+std_,color=col, alpha=0.2)
+
+
+cur_err = ERR_Addi_rand
+col = '#C20770'
+mean_=cur_err.T.mean(-1)
+std_=cur_err.T.std(-1)
+plt.plot(mean_,color=col)
+plt.fill_between(range(ITER_count),mean_-std_,mean_+std_,color=col, alpha=0.2)
+
+cur_err = ERR_Addi
+col = '#37B10F'
+mean_=cur_err.T.mean(-1)
+std_=cur_err.T.std(-1)
+plt.plot(mean_,color=col)
+plt.fill_between(range(ITER_count),mean_-std_,mean_+std_,color=col, alpha=0.2)
+plt.ylim([0,1.5])
+plt.show()
+
+cur_err = ERR_GD 
+mean_=cur_err.T.mean(-1)
+plt.plot(mean_,label='GD')
+
+cur_err = ERR_Geo
+mean_=cur_err.T.mean(-1)
+plt.plot(mean_,label='GDM1')
+
+cur_err = ERR_Addi_rand
+mean_=cur_err.T.mean(-1)
+plt.plot(mean_,label='GDM2 zero mean')
+
+cur_err = ERR_Addi
+mean_=cur_err.T.mean(-1)
+plt.plot(mean_,label='GDM2 nonz mean')
+plt.ylim([0,1.8])
+plt.grid()
+
+MeanFastSTMF=(Error_FastSTMF).mean()
+plt.plot(MeanFastSTMF*np.ones(mean_.shape),'-.',label='FastSTMF')
+
+plt.legend()
+plt.savefig("C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/MEthodComp.svg")
+
+    
+    
+    
+    
+    
+np.save('C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/ERR_GD_3',ERR_GD)
+np.save('C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/ERR_Geo_3',ERR_Geo)
+np.save('C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/ERR_Addi_3',ERR_Addi)
+np.save('C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/ERR_Addi_rand_3',ERR_Addi_rand)
+np.save('C:/Users/jkord/Desktop/work/tropical school/Tropical Linear approximation/numExamples/Error_FastSTMF_3',Error_FastSTMF )
+
+    
+print("FastSTMF: Mean = ", Error_FastSTMF.mean(),"and std = ",Error_FastSTMF.std())
+print("GD:       Mean = ", ERR_GD[:,-1].mean(),"and std = ",ERR_GD[:,-1].std())
+print("GDM1:     Mean = ", ERR_Geo[:,-1].mean(),"and std = ",ERR_Geo[:,-1].std())
+print("GDM2 zero:Mean = ", ERR_Addi_rand[:,-1].mean(),"and std = ",ERR_Addi_rand[:,-1].std())
+print("GDM2 nonz:Mean = ", ERR_Addi[:,-1].mean(),"and std = ",ERR_Addi[:,-1].std())
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
